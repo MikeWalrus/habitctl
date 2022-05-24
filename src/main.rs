@@ -12,6 +12,7 @@ use math::round;
 use std::cmp;
 use std::collections::HashMap;
 use std::env;
+use std::fmt;
 use std::fs;
 use std::fs::File;
 use std::fs::OpenOptions;
@@ -100,7 +101,7 @@ struct HabitCtl {
     entries: Vec<Entry>,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 enum DayStatus {
     Unknown,
     NotDone,
@@ -109,6 +110,27 @@ enum DayStatus {
     Skipped,
     Skipified,
     Warning,
+}
+
+impl fmt::Display for DayStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let symbol = match self {
+            DayStatus::Unknown => " ",
+            DayStatus::NotDone => " ",
+            DayStatus::Done => "━",
+            DayStatus::Satisfied => "─",
+            DayStatus::Skipped => "•",
+            DayStatus::Skipified => "·",
+            DayStatus::Warning => "!",
+        };
+        write!(f, "{symbol}")
+    }
+}
+
+fn spark(score: f32) -> String {
+    let sparks = vec![" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
+    let i = cmp::min(sparks.len() - 1, (score / sparks.len() as f32) as usize);
+    String::from(sparks[i])
 }
 
 impl HabitCtl {
@@ -199,7 +221,7 @@ impl HabitCtl {
         print!("{0: >25} ", "");
         let mut current = from;
         while current <= to {
-            print!("{0: >1}", self.spark(self.get_score(&current)));
+            print!("{0: >1}", spark(self.get_score(&current)));
             current = current
                 .checked_add_signed(chrono::Duration::days(1))
                 .unwrap();
@@ -236,10 +258,7 @@ impl HabitCtl {
 
         let mut current = from;
         while current <= to {
-            print!(
-                "{0: >1}",
-                &self.status_to_symbol(&self.day_status(habit, &current))
-            );
+            print!("{0: >1}", &self.day_status(habit, &current));
 
             current = current
                 .checked_add_signed(chrono::Duration::days(1))
@@ -331,11 +350,11 @@ impl HabitCtl {
     }
 
     fn edit(&self) {
-        self.open_file(&self.log_file);
+        open_file(&self.log_file);
     }
 
     fn edith(&self) {
-        self.open_file(&self.habits_file);
+        open_file(&self.habits_file);
     }
 
     fn get_todo(&self, todo_date: &NaiveDate) -> Vec<Habit> {
@@ -404,19 +423,6 @@ impl HabitCtl {
         } else {
             DayStatus::Unknown
         }
-    }
-
-    fn status_to_symbol(&self, status: &DayStatus) -> String {
-        let symbol = match status {
-            DayStatus::Unknown => " ",
-            DayStatus::NotDone => " ",
-            DayStatus::Done => "━",
-            DayStatus::Satisfied => "─",
-            DayStatus::Skipped => "•",
-            DayStatus::Skipified => "·",
-            DayStatus::Warning => "!",
-        };
-        String::from(symbol)
     }
 
     fn habit_satisfied(&self, habit: &Habit, date: &NaiveDate) -> bool {
@@ -569,22 +575,16 @@ impl HabitCtl {
             process::exit(1);
         }
     }
+}
 
-    fn spark(&self, score: f32) -> String {
-        let sparks = vec![" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
-        let i = cmp::min(sparks.len() - 1, (score / sparks.len() as f32) as usize);
-        String::from(sparks[i])
-    }
-
-    fn open_file(&self, filename: &Path) {
-        let editor = env::var("EDITOR").unwrap_or_else(|_| String::from("vi"));
-        Command::new(editor)
-            .arg(filename)
-            .spawn()
-            .unwrap()
-            .wait()
-            .unwrap();
-    }
+fn open_file(filename: &Path) {
+    let editor = env::var("EDITOR").unwrap_or_else(|_| String::from("vi"));
+    Command::new(editor)
+        .arg(filename)
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
 }
 
 struct Entry {
